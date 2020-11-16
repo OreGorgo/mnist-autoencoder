@@ -160,8 +160,6 @@ if __name__ == '__main__':
     #read data from files
     train_images, train_labels, test_images, test_labels = read_data(train_file, train_file_labels, test_file, test_file_labels)
 
-    print(train_labels[:50])
-
     autoencoder = load_model(model_file)
     encoder_length=len(autoencoder.layers)//2
 
@@ -190,6 +188,7 @@ if __name__ == '__main__':
 
         classifier.add(tf.keras.layers.Flatten())
         classifier.add(tf.keras.layers.Dense(nodes, activation='relu'))
+        classifier.add(tf.keras.layers.Dropout(0.1))
         classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
 
 
@@ -242,7 +241,7 @@ if __name__ == '__main__':
     # Print f1, precision, and recall scores
 
     print("Accuracy, Precision, Recall, F-Measure of test set:")
-    print(accuracy_score(test_labels, y_pred, average="macro"))
+    print(accuracy_score(test_labels, y_pred))
     print(precision_score(test_labels, y_pred, average="macro"))
     print(recall_score(test_labels, y_pred, average="macro"))
     print(f1_score(test_labels, y_pred, average="macro"))
