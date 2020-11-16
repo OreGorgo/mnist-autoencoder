@@ -78,7 +78,7 @@ def decoder(conv, filtersPerLayer, kernel_size):
     # # No activation
     # tf.keras.layers.Dense(latent_dim + latent_dim)
 
-def plot_error(autoencoder,  autoencoder_train, epochs):
+def plot_error(autoencoder,  autoencoder_train, epochs, hyper_list, losses):
     loss = autoencoder_train.history['loss']
     val_loss = autoencoder_train.history['val_loss']
     epochs = range(epochs)
@@ -89,20 +89,27 @@ def plot_error(autoencoder,  autoencoder_train, epochs):
     plt.legend()
     plt.show()
 
-    # plt.figure(figsize=(20, 4))
-    # print("Test Images")
-    # for i in range(10):
-    #     plt.subplot(2, 10, i + 1)
-    #     plt.imshow(valid_X[i, ..., 0], cmap='gray')
-    #
-    # plt.show()
-    # plt.figure(figsize=(20, 4))
-    # print("Reconstruction of Test Images")
-    # for i in range(10):
-    #     plt.subplot(2, 10, i + 1)
-    #     plt.imshow(pred[i, ..., 0], cmap='gray')
-    # plt.show()
+    for i in range(len(hyper_list[0])):
+        toPlot = []
+        for tup in hyper_list:
+            toPlot.append(tup[i])
+        plt.figure()
+        plt.plot(toPlot, losses, 'b', label='Validation loss')
+        plt.plot(toPlot, losses, 'ro', label='Validation loss')
+        if i==0:
+            plt.title('Convolution layers')
+        elif i==1:
+            plt.title('Filters at last convolution layer')
+        elif i==2:
+            plt.title('Kernel dimension')
+        elif i==3:
+            plt.title('Number of training epochs')
+        elif i==4:
+            plt.title('Batch size')
+        plt.legend()
+        plt.show()
 
+    # conv_layers, filtersPerLayer, kernel_size, epochs, batch_size
 
 
 if __name__ == '__main__':
@@ -123,10 +130,14 @@ if __name__ == '__main__':
     images = images.reshape(-1, 28, 28, 1)
 
     action = 1
+    hyper_list = []
+    losses = []
 
     while action < 3:
+
+
         conv_layers, filtersPerLayer, kernel_size, epochs, batch_size = read_hyperparameters()
-        # print(conv_layers, filtersPerLayer[0], filter_size)
+        hyper_list.append((conv_layers, filtersPerLayer[-1], kernel_size[0], epochs, batch_size))
 
         input_img = tf.keras.Input(shape=(28, 28, 1))
 
@@ -143,6 +154,8 @@ if __name__ == '__main__':
         autoencoder_train = autoencoder.fit(train_X, train_X, batch_size=batch_size, epochs=epochs, verbose=2, validation_data=(valid_X, valid_X))
         #autoencoder_train contains info useful for plotting error
 
+        losses.append(autoencoder_train.history['val_loss'][-1])
+
         #predict the validation set
         pred = autoencoder.predict(valid_X)
 
@@ -157,11 +170,13 @@ if __name__ == '__main__':
             break
 
         elif action == 2:
-            plot_error(autoencoder, autoencoder_train, epochs)
+            plot_error(autoencoder, autoencoder_train, epochs, hyper_list, losses)
 
         print('Choose an action.')
         print('1,2 - Repeat the training with different hyperparameters')
         print('3 - Save the current trained model')
+
+        action = int(input())
 
 
     autoencoder.save('autoencoder.h5')
