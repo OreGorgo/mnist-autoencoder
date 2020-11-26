@@ -18,7 +18,8 @@ from keras.layers import Convolution2D, MaxPooling2D
 
 
 def read_hyperparameters():
-    filter_size = []
+    #reads all the hyperparameters for one experiment
+
     filters_number = []
 
     layers = int(input("Give number of Convolution layers : "))
@@ -26,11 +27,6 @@ def read_hyperparameters():
     print("Give number of convolutional filters every layer.One integer per line for every layer.")
     for i in range(layers):
         filters_number.append(int(input()))
-
-    # print("Give filter size for every layer.Input format : dim1 dim2 per line for every layer")
-    # for i in range(layers):
-    #     a, b = map(int, input().split())
-    #     filter_size.append((a,b))
 
     print("Give filter size.Input format : dim1 dim2 ")
     dim1, dim2 = map(int, input().split())
@@ -44,42 +40,38 @@ def read_hyperparameters():
 
 
 def encoder(image, filtersPerLayer, kernel_size):
-
     conv = image
-
-    # conv = tf.keras.layers.InputLayer(input_shape=(28, 28, 1))(image)
-
     counter = 0
+
     # encoder
+    #Add conv layers in a loop
     for layer_size in filtersPerLayer:
-        conv = tf.keras.layers.Conv2D(filters=layer_size, kernel_size=kernel_size, activation='relu', padding='same',)(conv)
-        conv = tf.keras.layers.BatchNormalization()(conv)
+        conv = tf.keras.layers.Conv2D(filters=layer_size, kernel_size=kernel_size, activation='relu', padding='same',)(conv) #conv layer with relu activation
+        conv = tf.keras.layers.BatchNormalization()(conv) #batch normalization
         if counter < 2:
-            conv = tf.keras.layers.MaxPooling2D(padding='same')(conv)
+            conv = tf.keras.layers.MaxPooling2D(padding='same')(conv) #pooling layer
         counter += 1
 
     return conv
 
-
 def decoder(conv, filtersPerLayer, kernel_size):
     counter = len(filtersPerLayer)
     # decoder
+    #Add conv layers in a loop
     for layer_size in reversed(filtersPerLayer):
         counter -= 1
-        conv = tf.keras.layers.Conv2D(filters=layer_size, kernel_size=kernel_size, activation='relu', padding='same')(conv)
-        conv = tf.keras.layers.BatchNormalization()(conv)
+        conv = tf.keras.layers.Conv2D(filters=layer_size, kernel_size=kernel_size, activation='relu', padding='same')(conv) #conv layer with relu activation
+        conv = tf.keras.layers.BatchNormalization()(conv) #batch normalization
         if counter < 2:
-            conv = tf.keras.layers.UpSampling2D()(conv)
+            conv = tf.keras.layers.UpSampling2D()(conv) #pooling layer
 
-    image = tf.keras.layers.Conv2D(filters=1, kernel_size=kernel_size, activation='sigmoid', padding='same')(conv)
+    image = tf.keras.layers.Conv2D(filters=1, kernel_size=kernel_size, activation='sigmoid', padding='same')(conv) #output layer
 
     return image
 
-    # tf.keras.layers.Flatten(),
-    # # No activation
-    # tf.keras.layers.Dense(latent_dim + latent_dim)
 
 def plot_error(autoencoder,  autoencoder_train, epochs, hyper_list, losses):
+    #plot loss vs epochs for both train and validation sets
     loss = autoencoder_train.history['loss']
     val_loss = autoencoder_train.history['val_loss']
     epochs = range(epochs)
@@ -90,6 +82,7 @@ def plot_error(autoencoder,  autoencoder_train, epochs, hyper_list, losses):
     plt.legend()
     plt.show()
 
+    #plot erros in training for every hyperparameter
     for i in range(len(hyper_list[0])):
         toPlot = []
         for tup in hyper_list:
@@ -110,19 +103,20 @@ def plot_error(autoencoder,  autoencoder_train, epochs, hyper_list, losses):
         plt.legend()
         plt.show()
 
-    # conv_layers, filtersPerLayer, kernel_size, epochs, batch_size
 
 
 if __name__ == '__main__':
     filename = 'train.dat'
 
     # read input from command line
-    for it, arg in enumerate(sys.argv[1:]):
+    for it, arg in enumerate(sys.argv):
         if arg == '-d':
+            print('peos')
             filename = sys.argv[it + 1]
 
     f = open(filename, "rb")
 
+    #unpack the data and switch byte order
     magic = struct.unpack('>I', f.read(4))[0]
     size = struct.unpack('>I', f.read(4))[0]
     rows = struct.unpack('>I', f.read(4))[0]
@@ -131,6 +125,7 @@ if __name__ == '__main__':
 
     f.close()
 
+    #imahe reshaping and pixel value normalization
     images = np.array(pixels)
     images = images/np.max(images)
     images = images.reshape(-1, 28, 28, 1)
@@ -140,7 +135,6 @@ if __name__ == '__main__':
     losses = []
 
     while action < 3:
-
 
         conv_layers, filtersPerLayer, kernel_size, epochs, batch_size = read_hyperparameters()
         hyper_list.append((conv_layers, filtersPerLayer[-1], kernel_size[0], epochs, batch_size))
@@ -162,8 +156,6 @@ if __name__ == '__main__':
 
         losses.append(autoencoder_train.history['val_loss'][-1])
 
-        #predict the validation set
-        pred = autoencoder.predict(valid_X)
 
         print('Training complete. Choose an action.')
         print('1 - Repeat the training with different hyperparameters')
@@ -186,10 +178,3 @@ if __name__ == '__main__':
 
 
     autoencoder.save('autoencoder.h5')
-
-
-
-    # filepath = './models/aa.h5'
-    # tf.keras.models.save_model(autoencoder, filepath, overwrite=True, include_optimizer=True, save_format=None, signatures=None, options=None)
-    #
-    # tf.saved_model.save(autoencoder, export_dir, signatures=None, options=None)

@@ -9,6 +9,7 @@ import tensorflow as tf
 from keras.models import load_model
 import sys
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 
 from keras.layers import Dense, Dropout, Activation, Flatten
@@ -18,14 +19,13 @@ from sklearn.metrics import f1_score, precision_score, recall_score, confusion_m
 
 
 def read_hyperparameters():
+    #reads all the hyperparameters for one experiment
 
     nodes = int(input("Give number of nodes in fully connected layer : "))
-
     epochs = int(input("Give number of epochs for training : "))
-
     batch_size = int(input("Give batch size : "))
 
-    return nodes, epochs, batch_size  # might need to change filterSize to filters_size
+    return nodes, epochs, batch_size
 
 
 def read_data(train_file, train_file_labels, test_file, test_file_labels):
@@ -33,6 +33,7 @@ def read_data(train_file, train_file_labels, test_file, test_file_labels):
     #read train images
     f = open(train_file, "rb")
 
+    #unpack data
     magic = struct.unpack('>I', f.read(4))[0]
     size = struct.unpack('>I', f.read(4))[0]
     rows = struct.unpack('>I', f.read(4))[0]
@@ -40,6 +41,7 @@ def read_data(train_file, train_file_labels, test_file, test_file_labels):
     pixels = list(f.read())
     f.close()
 
+    #reshape and normalize pixels
     images = np.array(pixels)
     images = images / np.max(images)
     train_images = images.reshape(-1, 28, 28, 1)
@@ -78,6 +80,7 @@ def read_data(train_file, train_file_labels, test_file, test_file_labels):
     return train_images, train_labels, test_images, test_labels
 
 def plots(autoencoder,  autoencoder_train, epochs, hyper_list, losses, X_train, y_train):
+    #plot loss vs epochs for both train and validation sets
     loss = autoencoder_train.history['loss']
     val_loss = autoencoder_train.history['val_loss']
     epochs = range(epochs)
@@ -88,6 +91,7 @@ def plots(autoencoder,  autoencoder_train, epochs, hyper_list, losses, X_train, 
     plt.legend()
     plt.show()
 
+    #plot accuracy vs epochs for both train and validation sets
     accuracy = autoencoder_train.history['accuracy']
     val_accuracy = autoencoder_train.history['val_accuracy']
     plt.figure()
@@ -100,7 +104,6 @@ def plots(autoencoder,  autoencoder_train, epochs, hyper_list, losses, X_train, 
     # Visualize some examples from the dataset.
     # We show a few examples of training images from each class.
     classes = [i for i in range(0, 10)]
-    #print(classes)
     num_classes = len(classes)
     samples_per_class = 7
     for y, cls in enumerate(classes):
@@ -115,6 +118,7 @@ def plots(autoencoder,  autoencoder_train, epochs, hyper_list, losses, X_train, 
                 plt.title(cls)
     plt.show()
 
+    #plot loss vs hyperparameters for all past experiments
     for i in range(len(hyper_list[0])):
         toPlot = []
         for tup in hyper_list:
@@ -131,12 +135,9 @@ def plots(autoencoder,  autoencoder_train, epochs, hyper_list, losses, X_train, 
         plt.legend()
         plt.show()
 
-    # conv_layers, filtersPerLayer, kernel_size, epochs, batch_size
-
-
 if __name__ == '__main__':
 
-    #this should be command line input
+    #Fallback values for the command line inputs
     train_file = 'train.dat'
     train_file_labels = 'train_labels.dat'
     test_file = 'test.dat'
@@ -144,7 +145,7 @@ if __name__ == '__main__':
     model_file = 'good_autoencoder.h5'
 
     #read input from command line
-    for it, arg in enumerate(sys.argv[1:]):
+    for it, arg in enumerate(sys.argv):
         if arg=='-d':
             train_file = sys.argv[it+1]
         elif arg == '-dl':
@@ -160,6 +161,7 @@ if __name__ == '__main__':
     #read data from files
     train_images, train_labels, test_images, test_labels = read_data(train_file, train_file_labels, test_file, test_file_labels)
 
+    # load autoencoder
     autoencoder = load_model(model_file)
     encoder_length=len(autoencoder.layers)//2
 
@@ -173,46 +175,47 @@ if __name__ == '__main__':
         answer = input()
 
         if answer == 'y' or answer == 'yes':
-            classifier_path = input("Type the pre-trained classifier path")
+            classifier_path = input("Type the pre-trained classifier path. ")
             classifier = load_model(classifier_path)
             break
 
-
+        #create a new model from the encoder part of autoencoder
         model = tf.keras.Model(inputs=autoencoder.input, outputs=autoencoder.layers[encoder_length-1].output)
 
         nodes, epochs, batch_size = read_hyperparameters()
         hyper_list.append((nodes, epochs, batch_size))
 
+        # Initialize the classifier and add the encoder layers to it
         classifier = tf.keras.Sequential()
         classifier.add(model)
 
+        #add flatten, fully connected and output layers
         classifier.add(tf.keras.layers.Flatten())
         classifier.add(tf.keras.layers.Dense(nodes, activation='relu'))
-        classifier.add(tf.keras.layers.Dropout(0.1))
+        #classifier.add(tf.keras.layers.Dropout(0.1))
         classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
 
 
-        #classifier.add(tf.keras.layers.Softmax())
-
-        classifier.compile(loss='sparse_categorical_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-                           metrics=['accuracy'])
+        classifier.compile(loss='sparse_categorical_crossentropy', optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), metrics=['accuracy'])
 
         classifier.summary()
 
+        #make encoder non trainable
         classifier.layers[0].trainable = False
         classifier.layers[1].trainable = False
         classifier.layers[3].trainable = False
 
+        #train the fully connected layer only
         classifier_train = classifier.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, validation_split=0.3, verbose=1, use_multiprocessing=True)
 
         losses.append(classifier_train.history['loss'][-1])
 
-        # classifier.layers[0].trainable = True
-        # classifier.layers[1].trainable = True
-        # classifier.layers[3].trainable = True
-        #
-        # classifier.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, validation_split=0.3,
-        #                verbose=1, use_multiprocessing=True)
+        #train the entire model
+        classifier.layers[0].trainable = True
+        classifier.layers[1].trainable = True
+        classifier.layers[3].trainable = True
+
+        classifier.fit(train_images, train_labels, batch_size=batch_size, epochs=epochs, validation_split=0.3, verbose=1, use_multiprocessing=True)
 
 
         print('Training complete. Choose an action.')
@@ -240,11 +243,12 @@ if __name__ == '__main__':
 
     # Print f1, precision, and recall scores
 
-    print("Accuracy, Precision, Recall, F-Measure of test set:")
+    print("Accuracy of test set:")
     print(accuracy_score(test_labels, y_pred))
-    print(precision_score(test_labels, y_pred, average="macro"))
-    print(recall_score(test_labels, y_pred, average="macro"))
-    print(f1_score(test_labels, y_pred, average="macro"))
+
+
+    print('Classification Report:')
+    print(classification_report(test_labels, y_pred))
 
 
     classifier.save('classifier.h5')
